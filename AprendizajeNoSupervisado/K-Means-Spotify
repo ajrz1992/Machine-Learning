@@ -1,0 +1,85 @@
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Cargar el archivo CSV
+df = pd.read_csv('Spotify_Youtube.csv')
+
+# Seleccionar solo las columnas numéricas para el clustering
+numerical_features = [
+    'Danceability', 'Energy', 'Key', 'Loudness', 'Speechiness', 
+    'Acousticness', 'Instrumentalness', 'Liveness', 'Valence', 
+    'Tempo', 'Duration_ms', 'Stream', 'Views', 'Likes', 'Comments'
+]
+
+df_numeric = df[numerical_features]
+
+# Manejar valores faltantes
+# Imputar valores faltantes con la media de cada columna
+df_numeric_clean = df_numeric.fillna(df_numeric.mean())
+
+# Estandarizar los datos limpios
+scaler = StandardScaler()
+df_scaled = scaler.fit_transform(df_numeric_clean)
+
+# Determinar el número óptimo de clusters usando el método del codo
+inertia = []
+k_range = range(1, 11)  # Probar con 1 a 10 clusters
+
+for k in k_range:
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(df_scaled)
+    inertia.append(kmeans.inertia_)
+
+# Graficar el codo
+plt.figure(figsize=(8, 5))
+plt.plot(k_range, inertia, marker='o')
+plt.xlabel('Número de Clusters')
+plt.ylabel('Inercia')
+plt.title('Método del Codo para Determinar el Número Óptimo de Clusters')
+plt.show()
+
+
+# Aplicar K-Means con el número óptimo de clusters
+optimal_k = 3  # Ajusta esto según el gráfico del codo
+kmeans = KMeans(n_clusters=optimal_k, random_state=42)
+clusters = kmeans.fit_predict(df_scaled)
+
+# Añadir la columna de clusters al DataFrame original
+df_clean = df.loc[df_numeric_clean.index]  # Asegurarse de mantener el DataFrame original sincronizado
+df_clean['Cluster'] = clusters
+
+# Visualizar los clusters (solo las primeras dos características para simplificación)
+plt.figure(figsize=(10, 6))
+sns.scatterplot(x=df_clean['Danceability'], y=df_clean['Energy'], hue=df_clean['Cluster'], palette='viridis')
+plt.xlabel('Danceability')
+plt.ylabel('Energy')
+plt.title('Visualización de Clusters')
+plt.legend(title='Cluster')
+plt.show()
+
+# Obtener los 10 principales elementos de cada cluster
+top_n = 10
+cluster_top_tracks = {}
+
+for cluster_num in range(optimal_k):
+    # Filtrar las canciones del cluster
+    cluster_data = df_clean[df_clean['Cluster'] == cluster_num]
+    
+    # Ordenar por la métrica deseada (número de streams en este caso)
+    top_tracks = cluster_data.sort_values(by='Stream', ascending=False).head(top_n)
+    
+    # Almacenar en el diccionario
+    cluster_top_tracks[cluster_num] = top_tracks[['Track', 'Artist', 'Stream']]
+
+# Imprimir los 10 principales elementos de cada cluster
+for cluster_num, top_tracks in cluster_top_tracks.items():
+    print(f"\nTop {top_n} tracks in Cluster {cluster_num}:")
+    print(top_tracks)
+
+# Guardar los resultados en archivos CSV
+for cluster_num, top_tracks in cluster_top_tracks.items():
+    top_tracks.to_csv(f'top_tracks_cluster_{cluster_num}.csv', index=False)
