@@ -1,0 +1,165 @@
+import pandas as pd
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Configuración de estilo de los gráficos
+sns.set(style="whitegrid")
+
+# Paso 1: Crear un DataFrame con datos simulados para 5 países
+np.random.seed(0)  # Para reproducibilidad
+
+# Nombres de países en español
+countries = ['EE.UU.', 'Brasil', 'Alemania', 'Japón', 'Australia']
+# Nombres de proteínas en español
+protein_types = ['Albúmina', 'Globulina', 'Caseína', 'Colágeno', 'Elastina', 'Fibrinógeno', 'Miosina', 'Hemoglobina']
+
+# Simular datos de consumo de proteínas en diferentes países
+data = pd.DataFrame(np.random.rand(5, 8) * 100, columns=protein_types)
+data['País'] = countries
+
+# Agregar una columna de valor total de consumo de proteínas
+data['Total'] = data[protein_types].sum(axis=1)
+
+# Inspeccionar los primeros registros del dataset
+print("Primeros registros del dataset:")
+print(data.head())
+
+# Mostrar la estructura del dataset
+print("\nEstructura del dataset:")
+print(data.info())
+
+# Paso 2: Preparar los datos para el PCA
+# Seleccionar las columnas de proteínas (sin la columna 'País' y 'Total')
+protein_data = data[protein_types]  # Solo usamos las columnas de proteínas
+
+# Escalar los datos para que todas las proteínas tengan la misma importancia
+scaler = StandardScaler()
+scaled_data = scaler.fit_transform(protein_data)
+
+# Verificar que los datos hayan sido escalados
+print("\nDatos escalados (primeros 5 registros):")
+print(scaled_data[:5])
+
+# Paso 3: Realizar el PCA
+# Aplicar PCA para encontrar los componentes principales
+pca = PCA()  # No limitamos el número de componentes para obtener todos
+pca_result = pca.fit_transform(scaled_data)
+
+# Mostrar la varianza explicada por cada componente principal
+explained_variance = pca.explained_variance_ratio_
+print(f"\nVarianza explicada por los componentes principales:")
+for i, var in enumerate(explained_variance):
+    print(f"Componente {i+1}: {var:.2f}")
+
+# Paso 4: Visualizar los resultados del PCA
+# Crear un DataFrame con los resultados del PCA
+pca_df = pd.DataFrame(data=pca_result, columns=[f'PC{i+1}' for i in range(pca_result.shape[1])])
+pca_df['País'] = data['País']
+
+# Crear gráficos con subplots
+plt.figure(figsize=(20, 10))
+
+# Gráfico de dispersión
+plt.subplot(2, 3, 1)
+sns.scatterplot(x='PC1', y='PC2', data=pca_df, hue='País', palette='tab20', s=100, legend=False)
+for i in range(pca_df.shape[0]):
+    plt.text(x=pca_df.PC1[i]+0.1, y=pca_df.PC2[i], s=pca_df.País[i], fontsize=12)
+plt.title('PCA - Consumo de Proteínas en 5 Países')
+plt.xlabel(f'PC1 - {explained_variance[0]*100:.2f}% Varianza Explicada')
+plt.ylabel(f'PC2 - {explained_variance[1]*100:.2f}% Varianza Explicada')
+plt.grid()
+
+# Scree Plot
+plt.subplot(2, 3, 2)
+plt.plot(range(1, len(explained_variance) + 1), explained_variance, 'bo-', markersize=10)
+plt.title('Scree Plot')
+plt.xlabel('Número de Componente Principal')
+plt.ylabel('Varianza Explicada')
+plt.xticks(range(1, len(explained_variance) + 1))
+plt.grid()
+
+# Gráfico de contribución de variables
+plt.subplot(2, 3, 3)
+# Calculamos la contribución de cada variable (proteína) a los dos primeros componentes principales
+contrib = pd.DataFrame(pca.components_.T, columns=[f'PC{i+1}' for i in range(pca.components_.shape[0])], index=protein_types)
+contrib_abs = contrib.abs()
+contrib_sum = contrib_abs.sum(axis=1)
+
+# Ordenar por la contribución total
+contrib_sum = contrib_sum.sort_values(ascending=False)
+
+plt.barh(contrib_sum.index, contrib_sum.values, color='steelblue')
+plt.title('Contribución de Variables a los Componentes Principales')
+plt.xlabel('Contribución Total')
+plt.ylabel('Proteína')
+plt.grid(axis='x')
+
+# Gráfico de contribución de las variables en forma de cruz
+plt.subplot(2, 3, 4)
+plt.axhline(0, color='gray', linewidth=0.5)
+plt.axvline(0, color='gray', linewidth=0.5)
+
+# Dibujar los vectores de carga para cada variable
+for i, protein in enumerate(protein_types):
+    plt.arrow(0, 0, pca.components_[0, i], pca.components_[1, i], 
+              color='r', alpha=0.75, head_width=0.05, length_includes_head=True)
+    plt.text(pca.components_[0, i] + 0.02, pca.components_[1, i] + 0.02, protein, color='black', ha='center', va='center')
+
+plt.title('Loading Plot - Contribución de Variables')
+plt.xlabel(f'PC1 - {explained_variance[0]*100:.2f}% Varianza Explicada')
+plt.ylabel(f'PC2 - {explained_variance[1]*100:.2f}% Varianza Explicada')
+plt.grid()
+
+plt.tight_layout()
+plt.show()
+
+
+#codigo añadido 
+
+# Mapa de Calor de la Matriz de Correlación
+plt.figure(figsize=(10, 6))
+sns.heatmap(protein_data.corr(), annot=True, cmap='coolwarm', fmt=".2f")
+plt.title('Mapa de Calor de la Matriz de Correlación')
+plt.show()
+
+# Biplot
+plt.figure(figsize=(10, 7))
+plt.scatter(pca_df['PC1'], pca_df['PC2'], s=100, c='b')
+
+for i in range(len(protein_types)):
+    plt.arrow(0, 0, pca.components_[0, i], pca.components_[1, i], color='r', alpha=0.5)
+    plt.text(pca.components_[0, i] * 1.15, pca.components_[1, i] * 1.15, protein_types[i], color='g', ha='center', va='center')
+
+plt.xlabel(f'PC1 - {explained_variance[0]*100:.2f}% Varianza Explicada')
+plt.ylabel(f'PC2 - {explained_variance[1]*100:.2f}% Varianza Explicada')
+plt.title('Biplot')
+plt.grid()
+plt.show()
+
+# Cumulative Explained Variance Plot
+cumulative_variance = np.cumsum(explained_variance)
+
+plt.figure(figsize=(8, 5))
+plt.plot(range(1, len(cumulative_variance) + 1), cumulative_variance, marker='o', linestyle='--', color='b')
+plt.title('Varianza Explicada Acumulada')
+plt.xlabel('Número de Componente Principal')
+plt.ylabel('Varianza Explicada Acumulada')
+plt.grid()
+plt.show()
+
+# Gráfico 3D de los Componentes Principales (si PC3 es relevante)
+from mpl_toolkits.mplot3d import Axes3D
+
+fig = plt.figure(figsize=(8, 6))
+ax = fig.add_subplot(111, projection='3d')
+
+ax.scatter(pca_df['PC1'], pca_df['PC2'], pca_df['PC3'], c='b', s=100)
+
+ax.set_xlabel(f'PC1 - {explained_variance[0]*100:.2f}% Varianza Explicada')
+ax.set_ylabel(f'PC2 - {explained_variance[1]*100:.2f}% Varianza Explicada')
+ax.set_zlabel(f'PC3 - {explained_variance[2]*100:.2f}% Varianza Explicada')
+ax.set_title('Gráfico 3D de los Componentes Principales')
+plt.show()
