@@ -1,0 +1,62 @@
+# Importar bibliotecas necesarias
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.datasets import fetch_olivetti_faces
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
+
+# Cargar el conjunto de datos de caras
+faces = fetch_olivetti_faces()
+X = faces.data  # Matriz de características (imágenes aplanadas)
+y = faces.target  # Etiquetas de clase (ID de las personas)
+
+# Visualizar algunas imágenes de caras
+fig, axes = plt.subplots(2, 5, figsize=(10, 5))
+for i, ax in enumerate(axes.flat):
+    ax.imshow(X[i].reshape(64, 64), cmap='gray')
+    ax.set_xticks([])
+    ax.set_yticks([])
+plt.show()
+
+# Dividir el conjunto de datos en entrenamiento y prueba
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# Aplicar PCA para reducir la dimensionalidad
+n_components = 100  # Número de componentes principales
+pca = PCA(n_components=n_components, whiten=True).fit(X_train)
+
+# Gráfico de Varianza Explicada por los Componentes Principales
+plt.figure(figsize=(8, 6))
+explained_variance_ratio = np.cumsum(pca.explained_variance_ratio_)
+plt.plot(explained_variance_ratio, marker='o')
+plt.title('Varianza Explicada por los Componentes Principales')
+plt.xlabel('Número de Componentes')
+plt.ylabel('Varianza Explicada Acumulada')
+plt.grid(True)
+plt.show()
+
+# Transformar los datos de entrenamiento y prueba
+X_train_pca = pca.transform(X_train)
+X_test_pca = pca.transform(X_test)
+
+# Entrenar un clasificador k-NN con los datos reducidos
+knn = KNeighborsClassifier(n_neighbors=5)
+knn.fit(X_train_pca, y_train)
+
+# Predecir las etiquetas para los datos de prueba
+y_pred = knn.predict(X_test_pca)
+
+# Calcular la precisión del modelo
+accuracy = accuracy_score(y_test, y_pred)
+print(f'Precisión del reconocimiento facial con PCA: {accuracy * 100:.2f}%')
+
+# Visualizar algunas predicciones
+fig, axes = plt.subplots(2, 5, figsize=(10, 5))
+for i, ax in enumerate(axes.flat):
+    ax.imshow(X_test[i].reshape(64, 64), cmap='gray')
+    ax.set_title(f'Pred: {y_pred[i]}, Real: {y_test[i]}')
+    ax.set_xticks([])
+    ax.set_yticks([])
+plt.show()
